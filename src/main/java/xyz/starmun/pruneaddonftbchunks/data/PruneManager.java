@@ -44,13 +44,13 @@ public class PruneManager {
     public static PruneManager getPruneManager() {
         return pruneManager == null ? pruneManager = new PruneManager() : pruneManager;
     }
-
-    public static boolean prune(ServerLevel level, String subDirectory, boolean doNotBackup) {
+    public static boolean prune(@Nullable ServerLevel level, @Nullable DataFileType subDirectory, @Nullable boolean doNotBackup) {
         ResourceKey<Level> levelKey = level == null ? Level.OVERWORLD : level.dimension();
-        String levelDataPath = LevelDataDirectory.getDirectoryFromDimensionKey(levelKey, subDirectory);
+        String levelDataPath = LevelDataDirectory.getDirectoryFromDimensionKey(levelKey, subDirectory == DataFileType.REGION_FILES ? "region" : "poi");
         String backupPath = doNotBackup ? null : levelDataPath + "pruned/" + subDirectory + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss")) + "/";
         Collection<String> namesOfRegionFilesWithClaimedChunks = PruneManager.getPruneManager().getNamesOfRegionFilesWithClaimedChunks(levelKey);
         return PruneManager.getPruneManager().pruneRegionFiles(levelDataPath, backupPath, namesOfRegionFilesWithClaimedChunks, !doNotBackup, level);
+        //return PruneManager.prune(level, subDirectory == DataFileType.REGION_FILES ? "region" : "poi", doNotBackup);
     }
 
     public static boolean manuallyPruneClaimAdjacentChunks(ResourceKey<Level> levelKey) {
@@ -59,11 +59,13 @@ public class PruneManager {
             HashSet<ServerPlayer> serverPlayers = new HashSet<>();
             ChunkMap chunkMap = playerLevel.getChunkSource().chunkMap;
             List<XZ> claimedRegions = PruneManager.getPruneManager().getAllClaimedRegions(levelKey);
+            List<ClaimedChunk> claimedChunks = PruneManager.getPruneManager().getAllClaimedChunksForLevel(levelKey);
             int oldLevel = 0;
             for (XZ region : claimedRegions) {
                 for (int x = region.x; x < region.x + 32; x++) {
                     for (int z = region.z; z < region.z + 32; z++) {
                         ChunkPos chunkPos = new ChunkPos(x, z);
+
                         CompoundTag tag = chunkMap.read(chunkPos);
                         ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkPos.toLong());
 
@@ -75,17 +77,19 @@ public class PruneManager {
                             chunkMap.updateChunkScheduling(chunkPos.toLong(), ChunkMap.MAX_CHUNK_DISTANCE + 1, holder, oldLevel);
                             chunkMap.processUnloads(() -> true);
                         }
-
-                        tag.remove("Level");
-                        CompoundTag levelTag = new CompoundTag();
-                        levelTag.putString("Status", "empty");
-                        levelTag.putInt("xPos", x);
-                        levelTag.putInt("zPos", z);
-                        levelTag.putBoolean("isLightOn", true);
-                        tag.put("Level", levelTag);
-                        PruneAddonFTBChunks.LOGGER.info("Pruning chunk" + x + ", " + z);
-                        chunkMap.write(chunkPos, tag);
-
+                        if(claimedChunks.stream().anyMatch(chunk->chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z)){
+                            claimedChunks.removeIf(chunk->chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z);
+                        }else {
+                            tag.remove("Level");
+                            CompoundTag levelTag = new CompoundTag();
+                            levelTag.putString("Status", "empty");
+                            levelTag.putInt("xPos", x);
+                            levelTag.putInt("zPos", z);
+                            levelTag.putBoolean("isLightOn", true);
+                            tag.put("Level", levelTag);
+                            PruneAddonFTBChunks.LOGGER.info("Pruning chunk" + x + ", " + z);
+                            chunkMap.write(chunkPos, tag);
+                        }
                         if (holder != null) {
 
                             //Server Reload
@@ -119,10 +123,7 @@ public class PruneManager {
         }
         return true;
     }
-    public static boolean prune(CommandSourceStack source, boolean deep, @Nullable ServerLevel level, @Nullable DataFileType subDirectory, @Nullable boolean doNotBackup) {
 
-        return PruneManager.prune(level, subDirectory == DataFileType.REGION_FILES ? "region" : "poi", doNotBackup);
-    }
     public List<XZ> getAllClaimedRegions(ResourceKey<Level> level) {
         return FTBChunksAPI.getManager().getAllClaimedChunks().stream()
                 .filter(map -> map.getPos().dimension.equals(level))
@@ -130,7 +131,7 @@ public class PruneManager {
                 .distinct().collect(Collectors.toList());
     }
 
-    public Collection<ClaimedChunk> getAllClaimedChunksForLevel(ResourceKey<Level> level) {
+    public List<ClaimedChunk> getAllClaimedChunksForLevel(ResourceKey<Level> level) {
         return FTBChunksAPI.getManager().getAllClaimedChunks().stream().filter(map -> map.getPos().dimension.equals(level))
                 .collect(Collectors.toList());
     }

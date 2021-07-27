@@ -45,20 +45,20 @@ public class PruneCommands {
 
         if (subDirectory == null) {
             source.sendSuccess(new TextComponent("Pruning region files."), true);
-            if (PruneManager.prune(source, deep, level, DataFileType.REGION_FILES, doNotBackup)) {
+            if (PruneManager.prune(level, DataFileType.REGION_FILES, doNotBackup)) {
                 source.sendSuccess(new TextComponent("Pruned " + DataFileType.REGION_FILES + " successfully!"), false);
             } else {
                 source.sendFailure(new TextComponent("Failed to prune region" + ", check the log for details."));
             }
             source.sendSuccess(new TextComponent("Pruning poi files."), true);
 
-            if (PruneManager.prune(source, deep, level, DataFileType.POI_FILES, doNotBackup)) {
+            if (PruneManager.prune(level, DataFileType.POI_FILES, doNotBackup)) {
                 source.sendSuccess(new TextComponent("Pruned " + DataFileType.POI_FILES + " successfully!"), false);
             } else {
                 source.sendFailure(new TextComponent("Failed to prune poi, check the log for details."));
             }
         } else {
-            if (PruneManager.prune(source, deep, level, subDirectory, doNotBackup)) {
+            if (PruneManager.prune(level, subDirectory, doNotBackup)) {
                 source.sendSuccess(new TextComponent("Pruned " + subDirectory + " successfully!"), false);
             } else {
                 source.sendFailure(new TextComponent("Failed to prune " + subDirectory + ", check the log for details."));
