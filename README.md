@@ -2,30 +2,24 @@ This mod adds admin commands for pruning region and poi files which do not have 
 
 ## Commands
 
-### prune region\_files
+### prune
    
-Prunes all **REGION** files of a world-level/dimension which do not contain any chunks claimed by ftb-chunks.
+Prunes region and poi files of a dimension.  
+Removes all the files which do not contain any chunks claimed by FTB-Chunks.
 
-**Syntax**: /prune region\_files [dimension &lt;dimension&gt;] [doNotBackup &lt;true | false&gt;]
-
-#### Parameters
-- **dimension**
-The world level/dimension to prune the data from. **default:** overworld
-- **do\_not\_backup**
-If set to true, pruned files will not be backed up. **default:** false
-Use with extreme caution! It will permanently delete files.
-
-### prune poi\_files
-Prunes all **POI** files of a world-level/dimension which do not contain any chunks claimed by ftb-chunks.
-
-**Syntax**: /prune poi\_files [dimension &lt;dimension&gt;] [doNotBackup &lt;true | false&gt;]
+**Syntax**: /prune [region_files | poi_files] [dimension &lt;dimension&gt;] [doNotBackup &lt;true | false&gt;]
 
 #### Parameters
-- **dimension**
-The world level/dimension to prune the data from. **default;** overworld
-- **do\_not\_backup**
-If set to true, pruned files will not be backed up. **default:** false
+-  **file-type:**  
+    The types of files which should be pruned, possible values are **region_files** and **poi_files**
+    - **default**:both      
+  
+-  **dimension:**
+    The dimension to prune the data from. 
+   - **default:** overworld
+-  **do\_not\_backup:**
+    If set to true, pruned files will not be backed up. 
+   - **default:** false   
 Use with extreme caution! It will permanently delete files.
-
-
+  
 Temporary logo by smashicons

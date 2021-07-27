@@ -16,36 +16,46 @@ group = project.maven_group
 loom {
 	silentMojangMappingsLicense()
 
-
 	useFabricMixin = true
 
 	dataGen {
 		mod project.mod_id
 	}
-
+	mixinConfig "mixin.pruneaddonftbchunks.json"
 	launches {
 		data {
 			arg "--existing", file("src/main/resources").absolutePath
 		}
 	}
 }
+
 repositories {
-	maven { url "https://www.cursemaven.com" }
-	maven { url "https://maven.latvian.dev" }
+	maven {
+		url "https://www.cursemaven.com"
+		content {
+			includeGroup "curse.maven"
+		}
+	}
+
+	maven {
+		url "https://maven.saps.dev/minecraft"
+		content {
+			includeGroup "dev.latvian.mods"
+			includeGroup "dev.ftb.mods"
+		}
+	}
+    maven { url "https://maven.architectury.dev/" }
+
 }
 
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	mappings minecraft.officialMojangMappings()
 	forge "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
+	modImplementation "dev.ftb.mods:ftb-library-forge:${rootProject.ftb_library_version}"
+	modImplementation "dev.ftb.mods:ftb-chunks-forge:${rootProject.ftb_chunks_version}"
 	//modCompile "curse.maven:kubejs-fabric-395864:${kubejs_file}"
-	modCompile "curse.maven:architectury-fabric-419697:${arch_file}"
-	//modCompile "curse.maven:rhino-416294:${rhino_file}"
-	modCompile "curse.maven:ftb-gui-library-404465:${ftbguilibrary_file}"
-	// modCompile "curse.maven:ftb-teams-404468:${ftbteams_file}"
-	//modCompile "dev.ftb.mods:ftb-teams-forge:1605.2.0-build.23"
-	//modCompile "curse.maven:ftb-ranks-314905:${ftbranks_file}"
-	modCompile "curse.maven:ftb-chunks-314906:${ftbchunks_file}"
+
 	modCompile "curse.maven:jei-238222:${jei_file}"
 
 	// To change the versions see the gradle.properties file
@@ -58,6 +68,14 @@ dependencies {
 
 	// PSA: Some older mods, compiled on Loom 0.2.1, might have outdated Maven POMs.
 	// You may need to force-disable transitiveness on them.
+}
+minecraft {
+	runs {
+		client {
+			property 'mixin.env.remapRefMap', 'true'
+			property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+		}
+	}
 }
 
 processResources {
@@ -122,15 +140,9 @@ publishing {
 		}
 	}
 	repositories {
-		maven {
-			url "${ENV.CI_API_V4_URL}/projects/${ENV.CI_PROJECT_ID}/packages/maven"
-			credentials(HttpHeaderCredentials) {
-				name = 'Job-Token'
-				value = ENV.CI_JOB_TOKEN
+			maven {
+				url "file:///${project.projectDir}/mcmodsrepo"
 			}
-			authentication {
-				header(HttpHeaderAuthentication)
-			}
-		}
+
 	}
 }
