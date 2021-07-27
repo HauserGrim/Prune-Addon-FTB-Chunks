@@ -1,30 +1,20 @@
 package xyz.starmun.pruneaddonftbchunks;
 
 import com.mojang.brigadier.arguments.BoolArgumentType;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ReceivingLevelScreen;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.server.ServerLifecycleHooks;
+import net.minecraftforge.server.command.EnumArgument;
 import org.jetbrains.annotations.Nullable;
-import xyz.starmun.pruneaddonftbchunks.data.LevelDataDirectory;
+import xyz.starmun.pruneaddonftbchunks.data.DataFileType;
 import xyz.starmun.pruneaddonftbchunks.data.PruneManager;
-
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Collection;
 
 @Mod.EventBusSubscriber
 public class PruneCommands {
@@ -33,51 +23,56 @@ public class PruneCommands {
     public static void registerCommands(RegisterCommandsEvent event) {
 
         event.getDispatcher()
-            .register(Commands.literal("prune").requires(source -> source.hasPermission(2))
-            .executes(context -> prune(context.getSource()))
-            .then(Commands.literal("region_files")
-                .executes(context -> prune(context.getSource(), null, "region", false))
-                .then(Commands.literal("dimension")
-                    .then(Commands.argument("dim", DimensionArgument.dimension())
-                        .executes(context -> prune(context.getSource(), DimensionArgument.getDimension(context, "dim"), "region", false))
-                        .then(Commands.literal("do_not_backup")
-                            .then(Commands.argument("doNotBackup", BoolArgumentType.bool())
-                                .executes(context -> prune(context.getSource(), DimensionArgument.getDimension(context, "dim"), "region", BoolArgumentType.getBool(context, "doNotBackup")))
-                            )
-                        )
-                    )
-                )
-            )
-            .then(Commands.literal("poi_files")
-                .executes(context -> prune(context.getSource(), null, "poi", false))
-                .then(Commands.literal("dimension")
-                    .then(Commands.argument("dim", DimensionArgument.dimension())
-                        .executes(context -> prune(context.getSource(), DimensionArgument.getDimension(context, "dim"), "poi", false))
-                        .then(Commands.literal("do_not_backup")
-                            .then(Commands.argument("doNotBackup", BoolArgumentType.bool())
-                                .executes(context -> prune(context.getSource(), DimensionArgument.getDimension(context, "dim"), "poi", BoolArgumentType.getBool(context, "doNotBackup")))
-                            )
-                        )
-                    )
-                )
-            )
-        );
+        .register(Commands.literal("prune").requires(source -> {
+            return source.hasPermission(2); //
+        }).executes(context -> {
+            return prune(context.getSource(), false, null, null, false); //
+        }).then(Commands.literal("-deep").then(Commands.argument("deep", BoolArgumentType.bool()).executes(context ->{
+            return prune(context.getSource(), BoolArgumentType.getBool(context, "deep"), null, null, false); //
+        }).then(Commands.literal("-file_type").then(Commands.argument("files", EnumArgument.enumArgument(DataFileType.class)).executes(context -> {
+            return prune(context.getSource(), BoolArgumentType.getBool(context, "deep"), null, context.getArgument("files", DataFileType.class), false); //
+        }).then(Commands.literal("-dimension").then(Commands.argument("dim", DimensionArgument.dimension()).executes(context -> {
+            return prune(context.getSource(), BoolArgumentType.getBool(context, "deep"), DimensionArgument.getDimension(context, "dim"), context.getArgument("files", DataFileType.class), false); //
+        }).then(Commands.literal("-do_not_backup").then(Commands.argument("doNotBackup", BoolArgumentType.bool()).executes(context -> {
+            return prune(context.getSource(), BoolArgumentType.getBool(context, "deep"), DimensionArgument.getDimension(context, "dim"), context.getArgument("files", DataFileType.class), BoolArgumentType.getBool(context, "doNotBackup")); //
+        }))))))))));
     }
 
-    private static int prune(CommandSourceStack source){
-        prune(source,null,"region",false);
-        prune(source,null,"poi",false);
-        return 1;
-    }
+    private static int prune(CommandSourceStack source, boolean deep, @Nullable ServerLevel level, @Nullable DataFileType subDirectory, boolean doNotBackup) {
 
-    private static int prune(CommandSourceStack source, @Nullable ServerLevel level,@Nullable String subDirectory, boolean doNotBackup) {
+        source.sendSuccess(new TextComponent("Starting Prune"), true);
+        ResourceKey<Level> levelKey = level == null ? Level.OVERWORLD : level.dimension();
 
-       if (PruneManager.prune(level, subDirectory,doNotBackup)) {
-            source.sendSuccess(new TextComponent("Pruned "+subDirectory+" successfully!" ), false);
+        if (subDirectory == null) {
+            source.sendSuccess(new TextComponent("Pruning region files."), true);
+            if (PruneManager.prune(source, deep, level, DataFileType.REGION_FILES, doNotBackup)) {
+                source.sendSuccess(new TextComponent("Pruned " + DataFileType.REGION_FILES + " successfully!"), false);
+            } else {
+                source.sendFailure(new TextComponent("Failed to prune region" + ", check the log for details."));
+            }
+            source.sendSuccess(new TextComponent("Pruning poi files."), true);
 
-           return 1;
+            if (PruneManager.prune(source, deep, level, DataFileType.POI_FILES, doNotBackup)) {
+                source.sendSuccess(new TextComponent("Pruned " + DataFileType.POI_FILES + " successfully!"), false);
+            } else {
+                source.sendFailure(new TextComponent("Failed to prune poi, check the log for details."));
+            }
+        } else {
+            if (PruneManager.prune(source, deep, level, subDirectory, doNotBackup)) {
+                source.sendSuccess(new TextComponent("Pruned " + subDirectory + " successfully!"), false);
+            } else {
+                source.sendFailure(new TextComponent("Failed to prune " + subDirectory + ", check the log for details."));
+            }
         }
-        source.sendFailure(new TextComponent("Failed to prune, check the log for details."));
+
+        if (deep) {
+            source.sendSuccess(new TextComponent("Starting deep pruning of claim adjacent chunks."), true);
+            if (PruneManager.manuallyPruneClaimAdjacentChunks(levelKey)) {
+                source.sendSuccess(new TextComponent("Deep prune complete."), true);
+            } else {
+                source.sendSuccess(new TextComponent("An error occurred while deep pruning, check the log for details."), true);
+            }
+        }
         return 1;
     }
 }

@@ -3,7 +3,9 @@ package xyz.starmun.pruneaddonftbchunks.data;
 import dev.ftb.mods.ftbchunks.data.ClaimedChunk;
 import dev.ftb.mods.ftbchunks.data.FTBChunksAPI;
 import dev.ftb.mods.ftblibrary.math.XZ;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.protocol.game.ClientboundChangeDifficultyPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ChunkHolder;
@@ -44,86 +46,83 @@ public class PruneManager {
     }
 
     public static boolean prune(ServerLevel level, String subDirectory, boolean doNotBackup) {
-
         ResourceKey<Level> levelKey = level == null ? Level.OVERWORLD : level.dimension();
         String levelDataPath = LevelDataDirectory.getDirectoryFromDimensionKey(levelKey, subDirectory);
         String backupPath = doNotBackup ? null : levelDataPath + "pruned/" + subDirectory + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss")) + "/";
         Collection<String> namesOfRegionFilesWithClaimedChunks = PruneManager.getPruneManager().getNamesOfRegionFilesWithClaimedChunks(levelKey);
-        boolean result = PruneManager.getPruneManager().pruneRegionFiles(levelDataPath, backupPath, namesOfRegionFilesWithClaimedChunks, !doNotBackup, level);
-
-        manuallyPruneClaimAdjacentChunks(subDirectory, levelKey);
-
-        return result;
+        return PruneManager.getPruneManager().pruneRegionFiles(levelDataPath, backupPath, namesOfRegionFilesWithClaimedChunks, !doNotBackup, level);
     }
 
-    private static void manuallyPruneClaimAdjacentChunks(String subDirectory, ResourceKey<Level> levelKey) {
+    public static boolean manuallyPruneClaimAdjacentChunks(ResourceKey<Level> levelKey) {
         ServerLevel playerLevel = ServerLifecycleHooks.getCurrentServer().getLevel(Level.OVERWORLD);
-        if (subDirectory.equals("region")) {
-            try {
-                HashSet<ServerPlayer> serverPlayers = new HashSet<>();
-                ChunkMap chunkMap = playerLevel.getChunkSource().chunkMap;
-                List<XZ> claimedRegions = PruneManager.getPruneManager().getAllClaimedRegions(levelKey);
-                int oldLevel = 0;
-                for (XZ region : claimedRegions) {
-                    for (int x = region.x; x < region.x + 32; x++) {
-                        for (int z = region.z; z < region.z + 32; z++) {
-                            ChunkPos chunkPos = new ChunkPos(x, z);
-                            CompoundTag tag = chunkMap.read(chunkPos);
-                            ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkPos.toLong());
+        try {
+            HashSet<ServerPlayer> serverPlayers = new HashSet<>();
+            ChunkMap chunkMap = playerLevel.getChunkSource().chunkMap;
+            List<XZ> claimedRegions = PruneManager.getPruneManager().getAllClaimedRegions(levelKey);
+            int oldLevel = 0;
+            for (XZ region : claimedRegions) {
+                for (int x = region.x; x < region.x + 32; x++) {
+                    for (int z = region.z; z < region.z + 32; z++) {
+                        ChunkPos chunkPos = new ChunkPos(x, z);
+                        CompoundTag tag = chunkMap.read(chunkPos);
+                        ChunkHolder holder = chunkMap.getVisibleChunkIfPresent(chunkPos.toLong());
 
-                            if (holder != null) {
-                                oldLevel = holder.getTicketLevel();
+                        if (holder != null) {
+                            oldLevel = holder.getTicketLevel();
 
-                                chunkMap.getPlayers(chunkPos, false).forEach(player -> serverPlayers.add(player));
-                                //Server unload
-                                chunkMap.updateChunkScheduling(chunkPos.toLong(), ChunkMap.MAX_CHUNK_DISTANCE + 1, holder, oldLevel);
-                                chunkMap.processUnloads(() -> true);
-                            }
+                            chunkMap.getPlayers(chunkPos, false).forEach(player -> serverPlayers.add(player));
+                            //Server unload
+                            chunkMap.updateChunkScheduling(chunkPos.toLong(), ChunkMap.MAX_CHUNK_DISTANCE + 1, holder, oldLevel);
+                            chunkMap.processUnloads(() -> true);
+                        }
 
-                            tag.remove("Level");
-                            CompoundTag levelTag = new CompoundTag();
-                            levelTag.putString("Status", "empty");
-                            levelTag.putInt("xPos", x);
-                            levelTag.putInt("zPos", z);
-                            levelTag.putBoolean("isLightOn", true);
-                            tag.put("Level", levelTag);
-                            PruneAddonFTBChunks.LOGGER.info("Pruning chunk" + x + ", " + z);
-                            chunkMap.write(chunkPos, tag);
+                        tag.remove("Level");
+                        CompoundTag levelTag = new CompoundTag();
+                        levelTag.putString("Status", "empty");
+                        levelTag.putInt("xPos", x);
+                        levelTag.putInt("zPos", z);
+                        levelTag.putBoolean("isLightOn", true);
+                        tag.put("Level", levelTag);
+                        PruneAddonFTBChunks.LOGGER.info("Pruning chunk" + x + ", " + z);
+                        chunkMap.write(chunkPos, tag);
 
-                            if (holder != null) {
+                        if (holder != null) {
 
-                                //Server Reload
-                                ChunkHolder newHolder = chunkMap.updateChunkScheduling(chunkPos.toLong(), oldLevel, null, ChunkMap.MAX_CHUNK_DISTANCE + 1);
-                                chunkMap.schedule(newHolder, ChunkStatus.FULL);
-                                playerLevel.getChunkSource().distanceManager.chunksToUpdateFutures.add(newHolder);
-                            }
+                            //Server Reload
+                            ChunkHolder newHolder = chunkMap.updateChunkScheduling(chunkPos.toLong(), oldLevel, null, ChunkMap.MAX_CHUNK_DISTANCE + 1);
+                            chunkMap.schedule(newHolder, ChunkStatus.FULL);
+                            playerLevel.getChunkSource().distanceManager.chunksToUpdateFutures.add(newHolder);
                         }
                     }
                 }
-                serverPlayers.forEach(player -> {
-                    ServerLevel serverworld = player.getLevel();// 1328
-                    LevelData iworldinfo = playerLevel.getLevelData();// 1329
-                    player.connection.send(new PrunePacket(playerLevel.dimensionType(), playerLevel.dimension(), BiomeManager.obfuscateSeed(playerLevel.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), playerLevel.isDebug(), playerLevel.isFlat(), true, true));// 1330
-                    player.connection.send(new ClientboundChangeDifficultyPacket(iworldinfo.getDifficulty(), iworldinfo.isDifficultyLocked()));// 1331
-                    player.server.getPlayerList().sendPlayerPermissionLevel(player);// 1332
-                    serverworld.removePlayer(player, true);// 1333
-                    player.revive();// 1334
-                    player.moveTo(player.getX(), player.getY(), player.getZ(), player.yRot, player.xRot);// 1335
-                    player.setLevel(playerLevel);// 1336
-                    playerLevel.addDuringCommandTeleport(player);// 1337
-                    player.connection.teleport(player.getX(), player.getY(), player.getZ(), player.yRot, player.xRot);// 1339
-                    player.gameMode.setLevel(playerLevel);// 1340
-                    player.server.getPlayerList().sendLevelInfo(player, playerLevel);// 1341
-                    player.server.getPlayerList().sendAllPlayerInfo(player);// 1342
-                    BasicEventHooks.firePlayerChangedDimensionEvent(player, serverworld.dimension(), playerLevel.dimension());// 1343
-                });
-            } catch (Throwable ex) {
-
-                PruneAddonFTBChunks.LOGGER.info(ex);
             }
+            serverPlayers.forEach(player -> {
+                ServerLevel serverworld = player.getLevel();// 1328
+                LevelData iworldinfo = playerLevel.getLevelData();// 1329
+                player.connection.send(new PrunePacket(playerLevel.dimensionType(), playerLevel.dimension(), BiomeManager.obfuscateSeed(playerLevel.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), playerLevel.isDebug(), playerLevel.isFlat(), true, true));// 1330
+                player.connection.send(new ClientboundChangeDifficultyPacket(iworldinfo.getDifficulty(), iworldinfo.isDifficultyLocked()));// 1331
+                player.server.getPlayerList().sendPlayerPermissionLevel(player);// 1332
+                serverworld.removePlayer(player, true);// 1333
+                player.revive();// 1334
+                player.moveTo(player.getX(), player.getY(), player.getZ(), player.yRot, player.xRot);// 1335
+                player.setLevel(playerLevel);// 1336
+                playerLevel.addDuringCommandTeleport(player);// 1337
+                player.connection.teleport(player.getX(), player.getY(), player.getZ(), player.yRot, player.xRot);// 1339
+                player.gameMode.setLevel(playerLevel);// 1340
+                player.server.getPlayerList().sendLevelInfo(player, playerLevel);// 1341
+                player.server.getPlayerList().sendAllPlayerInfo(player);// 1342
+                BasicEventHooks.firePlayerChangedDimensionEvent(player, serverworld.dimension(), playerLevel.dimension());// 1343
+            });
+        } catch (Throwable ex) {
+            PruneAddonFTBChunks.LOGGER.info(ex);
+            return  false;
         }
+        return true;
     }
+    public static boolean prune(CommandSourceStack source, boolean deep, @Nullable ServerLevel level, @Nullable DataFileType subDirectory, @Nullable boolean doNotBackup) {
 
+        return PruneManager.prune(level, subDirectory == DataFileType.REGION_FILES ? "region" : "poi", doNotBackup);
+    }
     public List<XZ> getAllClaimedRegions(ResourceKey<Level> level) {
         return FTBChunksAPI.getManager().getAllClaimedChunks().stream()
                 .filter(map -> map.getPos().dimension.equals(level))
