@@ -50,7 +50,6 @@ public class PruneManager {
         String backupPath = doNotBackup ? null : levelDataPath + "pruned/" + subDirectory + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyMMddHHmmss")) + "/";
         Collection<String> namesOfRegionFilesWithClaimedChunks = PruneManager.getPruneManager().getNamesOfRegionFilesWithClaimedChunks(levelKey);
         return PruneManager.getPruneManager().pruneRegionFiles(levelDataPath, backupPath, namesOfRegionFilesWithClaimedChunks, !doNotBackup, level);
-        //return PruneManager.prune(level, subDirectory == DataFileType.REGION_FILES ? "region" : "poi", doNotBackup);
     }
 
     public static boolean manuallyPruneClaimAdjacentChunks(ResourceKey<Level> levelKey) {
@@ -168,6 +167,10 @@ public class PruneManager {
                 for (String filename : regionFileNames) {
                     Files.move(Paths.get(fromPath + filename), Paths.get(toPath + filename), StandardCopyOption.REPLACE_EXISTING);
                     PruneAddonFTBChunks.LOGGER.info("Moved file: " + filename + " to " + toPath + filename);
+                }
+                for (String filename : filterFileNames) {
+                    Files.copy(Paths.get(fromPath + filename), Paths.get(toPath + filename), StandardCopyOption.REPLACE_EXISTING);
+                    PruneAddonFTBChunks.LOGGER.info("Copied file: " + filename + " to " + toPath + filename);
                 }
             } else {
                 for (String filename : regionFileNames) {
