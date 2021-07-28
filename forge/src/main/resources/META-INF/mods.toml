@@ -1,0 +1,47 @@
+modLoader = "javafml"
+loaderVersion = "[35,)"
+#issueTrackerURL = ""
+license = "Insert License Here"
+
+[[mods]]
+modId = "pruneaddonftbchunks"
+version = "${version}"
+displayName = "Prune Addon for FTB Chunks"
+authors = "starmun"
+description = '''
+This mod adds admin commands for pruning region and poi files which do not have any chunks claimed by ftb-chunks.'''
+#logoFile = ""
+
+[[dependencies.pruneaddonftbchunks]]
+modId = "forge"
+mandatory = true
+versionRange = "[35,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.pruneaddonftbchunks]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.16.2,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.pruneaddonftbchunks]]
+modId = "architectury"
+mandatory = true
+versionRange = "[1.1.55,)"
+ordering = "AFTER"
+side = "BOTH"
+[[dependencies.pruneaddonftbchunks]]
+modId = "ftbchunks"
+mandatory = true
+versionRange = "[1,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.pruneaddonftbchunks]]
+modId = "ftblibrary"
+mandatory = true
+versionRange = "[1,)"
+ordering = "AFTER"
+side = "BOTH"
