@@ -11,6 +11,4 @@ public interface IChunkMapExtensions {
     ChunkHolder pa$updateChunkScheduling(long position, int newLevel, ChunkHolder chunkHolder, int oldLevel);
 
     void pa$processUnloads(BooleanSupplier booleanSupplier);
-
-    DistanceManager pa$getDistanceManager();
 }

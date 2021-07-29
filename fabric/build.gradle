@@ -16,7 +16,8 @@ dependencies {
     modApi "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
     // Remove the next line if you don't want to depend on the API
     modApi "me.shedaniel:architectury-fabric:${rootProject.architectury_version}"
-
+    modImplementation "dev.ftb.mods:ftb-library-fabric:${rootProject.ftb_library_version}"
+    modImplementation "dev.ftb.mods:ftb-chunks-fabric:${rootProject.ftb_chunks_version}"
     implementation(project(path: ":common")) {
         transitive = false
     }

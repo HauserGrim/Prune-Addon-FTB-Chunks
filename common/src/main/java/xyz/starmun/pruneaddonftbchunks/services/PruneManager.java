@@ -1,12 +1,20 @@
 package xyz.starmun.pruneaddonftbchunks.services;
 
+import com.mojang.datafixers.util.Either;
 import dev.ftb.mods.ftbchunks.data.ClaimedChunk;
 import dev.ftb.mods.ftbchunks.data.FTBChunksAPI;
 import dev.ftb.mods.ftblibrary.math.XZ;
 import me.shedaniel.architectury.utils.GameInstance;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.protocol.game.ClientboundChangeDifficultyPacket;
+import net.minecraft.network.protocol.game.ClientboundDisconnectPacket;
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
@@ -14,14 +22,15 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.storage.LevelData;
+import net.minecraft.world.level.storage.ServerLevelData;
 import org.apache.commons.io.FilenameUtils;
 import org.jetbrains.annotations.Nullable;
 import xyz.starmun.pruneaddonftbchunks.PruneAddonFTBChunks;
-import xyz.starmun.pruneaddonftbchunks.contracts.IChunkMapExtensions;
-import xyz.starmun.pruneaddonftbchunks.contracts.IDistanceManagerExtensions;
-import xyz.starmun.pruneaddonftbchunks.contracts.IServerChunkCacheExtensions;
+import xyz.starmun.pruneaddonftbchunks.contracts.*;
 import xyz.starmun.pruneaddonftbchunks.data.DataFileType;
 import xyz.starmun.pruneaddonftbchunks.data.LevelDataDirectory;
 import xyz.starmun.pruneaddonftbchunks.data.PrunePacket;
@@ -47,6 +56,7 @@ public class PruneManager {
     public static PruneManager getPruneManager() {
         return pruneManager == null ? pruneManager = new PruneManager() : pruneManager;
     }
+
     public static boolean prune(@Nullable ServerLevel level, @Nullable DataFileType subDirectory, @Nullable boolean doNotBackup) {
         ResourceKey<Level> levelKey = level == null ? Level.OVERWORLD : level.dimension();
         String levelDataPath = LevelDataDirectory.getDirectoryFromDimensionKey(levelKey, subDirectory == DataFileType.REGION_FILES ? "region" : "poi");
@@ -56,15 +66,20 @@ public class PruneManager {
     }
 
     public static boolean manuallyPruneClaimAdjacentChunks(ResourceKey<Level> levelKey) {
+        MinecraftServer server = GameInstance.getServer();
+        ServerLevel serverLevel = server.getLevel(Level.OVERWORLD);
+        PruneAddonFTBChunks.LOGGER.info("Saving previous changes.");
+        serverLevel.save(null, true, false);
+        PruneAddonFTBChunks.LOGGER.info("Done saving previous changes.");
 
-        ServerLevel playerLevel =  GameInstance.getServer().getLevel(Level.OVERWORLD);
 
         try {
-            HashSet<ServerPlayer> serverPlayers = new HashSet<>();
-            ChunkMap chunkMap = playerLevel.getChunkSource().chunkMap;
+
+            ChunkMap chunkMap = serverLevel.getChunkSource().chunkMap;
             List<XZ> claimedRegions = PruneManager.getPruneManager().getAllClaimedRegions(levelKey);
             List<ClaimedChunk> claimedChunks = PruneManager.getPruneManager().getAllClaimedChunksForLevel(levelKey);
             IChunkMapExtensions chunkMapExtensions = ((IChunkMapExtensions) chunkMap);
+//
             int oldLevel = 0;
             for (XZ region : claimedRegions) {
                 for (int x = region.x; x < region.x + 32; x++) {
@@ -76,20 +91,18 @@ public class PruneManager {
                         if (holder != null) {
                             oldLevel = holder.getTicketLevel();
 
-                            chunkMap.getPlayers(chunkPos, false).forEach(player -> serverPlayers.add(player));
                             //Server unload
                             chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), ChunkMap.MAX_CHUNK_DISTANCE + 1, holder, oldLevel);
                             chunkMapExtensions.pa$processUnloads(() -> true);
                         }
-                        if(claimedChunks.stream().anyMatch(chunk->chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z)){
-                            claimedChunks.removeIf(chunk->chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z);
-                        }else if(tag != null){
+                        if (claimedChunks.stream().anyMatch(chunk -> chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z)) {
+                            claimedChunks.removeIf(chunk -> chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z);
+                        } else if (tag != null) {
                             tag.remove("Level");
                             CompoundTag levelTag = new CompoundTag();
-                            levelTag.putString("Status", "empty");
+                            levelTag.putString("Status", "");
                             levelTag.putInt("xPos", x);
                             levelTag.putInt("zPos", z);
-                            levelTag.putBoolean("isLightOn", true);
                             tag.put("Level", levelTag);
                             PruneAddonFTBChunks.LOGGER.info("Pruning chunk" + x + ", " + z);
                             chunkMap.write(chunkPos, tag);
@@ -97,32 +110,21 @@ public class PruneManager {
                         if (holder != null) {
 
                             //Server Reload
+
                             ChunkHolder newHolder = chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), oldLevel, null, ChunkMap.MAX_CHUNK_DISTANCE + 1);
                             chunkMap.schedule(newHolder, ChunkStatus.FULL);
-                            ((IDistanceManagerExtensions)((IServerChunkCacheExtensions)playerLevel.getChunkSource()).pa$getDistanceManager()).pa$markChunkToBeUpdated(newHolder);
+                            ((IDistanceManagerExtensions) ((IServerChunkCacheExtensions) serverLevel.getChunkSource()).pa$getDistanceManager()).pa$markChunkToBeUpdated(newHolder);
                         }
                     }
                 }
             }
-            serverPlayers.forEach(player -> {
-                ServerLevel serverworld = player.getLevel();// 1328
-                LevelData iworldinfo = playerLevel.getLevelData();// 1329
-                player.connection.send(new PrunePacket(playerLevel.dimensionType(), playerLevel.dimension(), BiomeManager.obfuscateSeed(playerLevel.getSeed()), player.gameMode.getGameModeForPlayer(), player.gameMode.getPreviousGameModeForPlayer(), playerLevel.isDebug(), playerLevel.isFlat(), true, true));// 1330
-                player.connection.send(new ClientboundChangeDifficultyPacket(iworldinfo.getDifficulty(), iworldinfo.isDifficultyLocked()));// 1331
-                player.server.getPlayerList().sendPlayerPermissionLevel(player);// 1332
-                serverworld.removePlayerImmediately(player);// 1333
-                player.removed = false;// 1334
-                player.moveTo(player.getX(), player.getY(), player.getZ(), player.yRot, player.xRot);// 1335
-                player.setLevel(playerLevel);// 1336
-                playerLevel.addDuringCommandTeleport(player);// 1337
-                player.connection.teleport(player.getX(), player.getY(), player.getZ(), player.yRot, player.xRot);// 1339
-                player.gameMode.setLevel(playerLevel);// 1340
-                player.server.getPlayerList().sendLevelInfo(player, playerLevel);// 1341
-                player.server.getPlayerList().sendAllPlayerInfo(player);// 1342
+            GameInstance.getServer().getPlayerList().getPlayers().forEach(player -> {
+                player.connection.send(new ClientboundDisconnectPacket(new TextComponent("Done pruning, rejoin now.")));
             });
+
         } catch (Throwable ex) {
-            PruneAddonFTBChunks.LOGGER.error("failed",ex);
-            return  false;
+            PruneAddonFTBChunks.LOGGER.error("failed", ex);
+            return false;
         }
         return true;
     }

@@ -1,5 +1,6 @@
-package xyz.starmun.pruneaddonftbchunks.forge.commands;
+package xyz.starmun.pruneaddonftbchunks.commands;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -8,22 +9,18 @@ import net.minecraft.network.chat.TextComponent;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.server.command.EnumArgument;
+
 import org.jetbrains.annotations.Nullable;
+import xyz.starmun.pruneaddonftbchunks.commands.arguments.EnumArgument;
 import xyz.starmun.pruneaddonftbchunks.data.DataFileType;
 import xyz.starmun.pruneaddonftbchunks.services.BackupManager;
 import xyz.starmun.pruneaddonftbchunks.services.PruneManager;
 
-@Mod.EventBusSubscriber
 public class PruneCommands {
 
-    @SubscribeEvent
-    public static void registerCommands(RegisterCommandsEvent event) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, Commands.CommandSelection commandSelection) {
 
-        event.getDispatcher().register(Commands.literal("prune").requires(source -> {
+        dispatcher.register(Commands.literal("prune").requires(source -> {
             return source.hasPermission(2); //
         }).executes(context -> {
             return prune(context.getSource(), false, null, null, false); //
