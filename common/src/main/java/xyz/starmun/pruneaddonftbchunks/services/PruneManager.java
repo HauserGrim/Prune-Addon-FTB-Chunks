@@ -67,19 +67,17 @@ public class PruneManager {
 
     public static boolean manuallyPruneClaimAdjacentChunks(ResourceKey<Level> levelKey) {
         MinecraftServer server = GameInstance.getServer();
-        ServerLevel serverLevel = server.getLevel(Level.OVERWORLD);
+        ServerLevel serverLevel = server.getLevel(levelKey);
         PruneAddonFTBChunks.LOGGER.info("Saving previous changes.");
         serverLevel.save(null, true, false);
         PruneAddonFTBChunks.LOGGER.info("Done saving previous changes.");
 
-
         try {
-
             ChunkMap chunkMap = serverLevel.getChunkSource().chunkMap;
             List<XZ> claimedRegions = PruneManager.getPruneManager().getAllClaimedRegions(levelKey);
             List<ClaimedChunk> claimedChunks = PruneManager.getPruneManager().getAllClaimedChunksForLevel(levelKey);
             IChunkMapExtensions chunkMapExtensions = ((IChunkMapExtensions) chunkMap);
-//
+
             int oldLevel = 0;
             for (XZ region : claimedRegions) {
                 for (int x = region.x; x < region.x + 32; x++) {
@@ -89,11 +87,10 @@ public class PruneManager {
                         CompoundTag tag = chunkMap.read(chunkPos);
                         ChunkHolder holder = chunkMapExtensions.pa$getVisibleChunkIfPresent(chunkPos.toLong());
                         if (holder != null) {
-                            oldLevel = holder.getTicketLevel();
-
                             //Server unload
                             chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), ChunkMap.MAX_CHUNK_DISTANCE + 1, holder, oldLevel);
                             chunkMapExtensions.pa$processUnloads(() -> true);
+                            oldLevel = holder.getTicketLevel();
                         }
                         if (claimedChunks.stream().anyMatch(chunk -> chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z)) {
                             claimedChunks.removeIf(chunk -> chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z);
@@ -108,9 +105,7 @@ public class PruneManager {
                             chunkMap.write(chunkPos, tag);
                         }
                         if (holder != null) {
-
                             //Server Reload
-
                             ChunkHolder newHolder = chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), oldLevel, null, ChunkMap.MAX_CHUNK_DISTANCE + 1);
                             chunkMap.schedule(newHolder, ChunkStatus.FULL);
                             ((IDistanceManagerExtensions) ((IServerChunkCacheExtensions) serverLevel.getChunkSource()).pa$getDistanceManager()).pa$markChunkToBeUpdated(newHolder);
