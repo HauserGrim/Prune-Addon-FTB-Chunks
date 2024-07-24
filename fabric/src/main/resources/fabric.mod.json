@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "examplemod",
+  "id": "prune-addon-ftb-chunks",
   "version": "${version}",
-  "name": "Example Mod",
+  "name": "Prune Addon for FTB Chunks",
   "description": "This is an example description! Tell everyone what your mod is about!",
   "authors": [
     "Me!"
@@ -11,23 +11,23 @@
     "homepage": "https://fabricmc.net/",
     "sources": "https://github.com/FabricMC/fabric-example-mod"
   },
-  "mixins": [
-    "pruneaddonftbchunks.mixins.json"
-  ],
-  "license": "Insert License Here",
-  "icon": "assets/examplemod/icon.png",
+  "license": "-",
+  "icon": "assets/prune-addon-ftb-chunks/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
       "xyz.starmun.pruneaddonftbchunks.fabric.PruneAddonFTBChunksFabric"
     ]
   },
-
+  "mixins": [
+    "prune-addon-ftb-chunks.mixins.json"
+  ],
   "depends": {
-    "fabricloader": ">=0.7.4",
-    "fabric": "*",
-    "minecraft": ">=1.16.4",
-    "architectury": ">=1.1.55"
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21",
+    "java": ">=21",
+    "architectury": ">=13.0.2",
+    "fabric-api": "*"
   },
   "suggests": {
     "flamingo": "*"

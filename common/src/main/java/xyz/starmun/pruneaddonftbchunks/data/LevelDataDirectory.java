@@ -1,15 +1,15 @@
 package xyz.starmun.pruneaddonftbchunks.data;
 
-import dev.ftb.mods.ftbchunks.data.FTBChunksAPI;
+import dev.ftb.mods.ftbchunks.data.ClaimedChunkManagerImpl;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelResource;
 
 public class LevelDataDirectory {
-    private static final String levelDataDirectory  = FTBChunksAPI.getManager().getMinecraftServer().getWorldPath(LevelResource.LEVEL_DATA_FILE).getParent().toString();
+    private static final String levelDataDirectory = ClaimedChunkManagerImpl.getInstance().getMinecraftServer().getWorldPath(LevelResource.LEVEL_DATA_FILE).getParent().toString();
+
     public static String getDirectoryFromDimensionKey(ResourceKey<Level> levelKey, String subDirectory) {
         if (Level.OVERWORLD.equals(levelKey)) {
-
             return levelDataDirectory  + "/"+ subDirectory+ "/";
         } else if (Level.NETHER.equals(levelKey)) {
             return levelDataDirectory + "/DIM-1/"+ subDirectory+ "/";

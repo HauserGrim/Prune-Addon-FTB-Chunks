@@ -1,14 +1,10 @@
 package xyz.starmun.pruneaddonftbchunks;
 
-import me.shedaniel.architectury.event.events.CommandRegistrationEvent;
+import dev.architectury.event.events.common.CommandRegistrationEvent;
 import net.minecraft.client.Minecraft;
-import net.minecraft.commands.synchronization.ArgumentSerializer;
-import net.minecraft.commands.synchronization.ArgumentTypes;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import xyz.starmun.pruneaddonftbchunks.commands.PruneCommands;
-import xyz.starmun.pruneaddonftbchunks.commands.arguments.EnumArgument;
-import xyz.starmun.pruneaddonftbchunks.data.DataFileType;
 
 public class PruneAddonFTBChunks   {
 	public static final String MOD_ID ="pruneaddonftbchunks";
@@ -19,7 +15,9 @@ public class PruneAddonFTBChunks   {
 		 return true;
 	}
 	public static void init() {
-		ArgumentTypes.register("pafc:enum", EnumArgument.class, (ArgumentSerializer) new EnumArgument.Serializer());
+		// TODO
+		//ArgumentTypeRegistry.registerArgumentType(null, EnumArgument.class, new EnumArgument.Serializer());
+		//ArgumentTypes.register("pafc:enum", EnumArgument.class, (ArgumentSerializer) new EnumArgument.Serializer());
 		CommandRegistrationEvent.EVENT.register(PruneCommands::register);
 	}
 }

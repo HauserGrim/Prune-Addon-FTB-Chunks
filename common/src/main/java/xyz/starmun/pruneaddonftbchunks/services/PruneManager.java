@@ -1,39 +1,28 @@
 package xyz.starmun.pruneaddonftbchunks.services;
 
-import com.mojang.datafixers.util.Either;
-import dev.ftb.mods.ftbchunks.data.ClaimedChunk;
-import dev.ftb.mods.ftbchunks.data.FTBChunksAPI;
+import dev.architectury.utils.GameInstance;
+import dev.ftb.mods.ftbchunks.api.ClaimedChunk;
+import dev.ftb.mods.ftbchunks.api.FTBChunksAPI;
 import dev.ftb.mods.ftblibrary.math.XZ;
-import me.shedaniel.architectury.utils.GameInstance;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.protocol.game.ClientboundChangeDifficultyPacket;
-import net.minecraft.network.protocol.game.ClientboundDisconnectPacket;
-import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.BiomeManager;
-import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.storage.LevelData;
-import net.minecraft.world.level.storage.ServerLevelData;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.apache.commons.io.FilenameUtils;
 import org.jetbrains.annotations.Nullable;
 import xyz.starmun.pruneaddonftbchunks.PruneAddonFTBChunks;
-import xyz.starmun.pruneaddonftbchunks.contracts.*;
+import xyz.starmun.pruneaddonftbchunks.contracts.IChunkMapExtensions;
+import xyz.starmun.pruneaddonftbchunks.contracts.IDistanceManagerExtensions;
+import xyz.starmun.pruneaddonftbchunks.contracts.IServerChunkCacheExtensions;
 import xyz.starmun.pruneaddonftbchunks.data.DataFileType;
 import xyz.starmun.pruneaddonftbchunks.data.LevelDataDirectory;
-import xyz.starmun.pruneaddonftbchunks.data.PrunePacket;
 
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
@@ -66,7 +55,9 @@ public class PruneManager {
     }
 
     public static boolean manuallyPruneClaimAdjacentChunks(ResourceKey<Level> levelKey) {
-        MinecraftServer server = GameInstance.getServer();
+        return false;
+        // TODO
+        /*MinecraftServer server = GameInstance.getServer();
         ServerLevel serverLevel = server.getLevel(levelKey);
         PruneAddonFTBChunks.LOGGER.info("Saving previous changes.");
         serverLevel.save(null, true, false);
@@ -80,21 +71,21 @@ public class PruneManager {
 
             int oldLevel = 0;
             for (XZ region : claimedRegions) {
-                for (int x = region.x; x < region.x + 32; x++) {
-                    for (int z = region.z; z < region.z + 32; z++) {
+                for (int x = region.x(); x < region.x() + 32; x++) {
+                    for (int z = region.z(); z < region.z() + 32; z++) {
                         ChunkPos chunkPos = new ChunkPos(x, z);
 
-                        CompoundTag tag = chunkMap.read(chunkPos);
+                        CompoundTag tag = chunkMap.read(chunkPos).join().get();
                         ChunkHolder holder = chunkMapExtensions.pa$getVisibleChunkIfPresent(chunkPos.toLong());
                         if (holder != null) {
                             //Server unload
-                            chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), ChunkMap.MAX_CHUNK_DISTANCE + 1, holder, oldLevel);
+                            chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), ChunkMap.MAX_VIEW_DISTANCE + 1, holder, oldLevel);
                             chunkMapExtensions.pa$processUnloads(() -> true);
                             oldLevel = holder.getTicketLevel();
                         }
-                        if (claimedChunks.stream().anyMatch(chunk -> chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z)) {
-                            claimedChunks.removeIf(chunk -> chunk.pos.x == chunkPos.x && chunk.pos.z == chunkPos.z);
-                        } else if (tag != null) {
+                        if (claimedChunks.stream().anyMatch(chunk -> chunk.getPos().x() == chunkPos.x && chunk.getPos().z() == chunkPos.z)) {
+                            claimedChunks.removeIf(chunk -> chunk.getPos().x() == chunkPos.x && chunk.getPos().z() == chunkPos.z);
+                        } else {
                             tag.remove("Level");
                             CompoundTag levelTag = new CompoundTag();
                             levelTag.putString("Status", "");
@@ -106,7 +97,7 @@ public class PruneManager {
                         }
                         if (holder != null) {
                             //Server Reload
-                            ChunkHolder newHolder = chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), oldLevel, null, ChunkMap.MAX_CHUNK_DISTANCE + 1);
+                            ChunkHolder newHolder = chunkMapExtensions.pa$updateChunkScheduling(chunkPos.toLong(), oldLevel, null, ChunkMap.MAX_VIEW_DISTANCE + 1);
                             chunkMap.schedule(newHolder, ChunkStatus.FULL);
                             ((IDistanceManagerExtensions) ((IServerChunkCacheExtensions) serverLevel.getChunkSource()).pa$getDistanceManager()).pa$markChunkToBeUpdated(newHolder);
                         }
@@ -114,25 +105,25 @@ public class PruneManager {
                 }
             }
             GameInstance.getServer().getPlayerList().getPlayers().forEach(player -> {
-                player.connection.send(new ClientboundDisconnectPacket(new TextComponent("Done pruning, rejoin now.")));
+                player.connection.send(new ClientboundDisconnectPacket(Component.literal("Done pruning, rejoin now.")));
             });
 
         } catch (Throwable ex) {
             PruneAddonFTBChunks.LOGGER.error("failed", ex);
             return false;
         }
-        return true;
+        return true;*/
     }
 
     public List<XZ> getAllClaimedRegions(ResourceKey<Level> level) {
-        return FTBChunksAPI.getManager().getAllClaimedChunks().stream()
-                .filter(map -> map.getPos().dimension.equals(level))
-                .map(map -> XZ.of((map.pos.x >> 5) << 5, (map.pos.z >> 5) << 5))
+        return FTBChunksAPI.api().getManager().getAllClaimedChunks().stream()
+                .filter(map -> map.getPos().dimension().equals(level))
+                .map(map -> XZ.of((map.getPos().x() >> 5) << 5, (map.getPos().z() >> 5) << 5))
                 .distinct().collect(Collectors.toList());
     }
 
     public List<ClaimedChunk> getAllClaimedChunksForLevel(ResourceKey<Level> level) {
-        return FTBChunksAPI.getManager().getAllClaimedChunks().stream().filter(map -> map.getPos().dimension.equals(level))
+        return FTBChunksAPI.api().getManager().getAllClaimedChunks().stream().filter(map -> map.getPos().dimension().equals(level))
                 .collect(Collectors.toList());
     }
 
@@ -141,7 +132,7 @@ public class PruneManager {
 
         for (ClaimedChunk claimedChunk : this.getAllClaimedChunksForLevel(level)) {
             XZ region = XZ.regionFromChunk(claimedChunk.getPos().getChunkPos());
-            namesOfRegionFilesWithClaimedChunks.add("r." + region.x + "." + region.z + ".mca");
+            namesOfRegionFilesWithClaimedChunks.add("r." + region.x() + "." + region.z() + ".mca");
         }
         return new ArrayList<>(namesOfRegionFilesWithClaimedChunks);
     }

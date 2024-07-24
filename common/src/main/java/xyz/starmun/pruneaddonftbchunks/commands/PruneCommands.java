@@ -2,10 +2,11 @@ package xyz.starmun.pruneaddonftbchunks.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
+import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.DimensionArgument;
-import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -18,7 +19,7 @@ import xyz.starmun.pruneaddonftbchunks.services.PruneManager;
 
 public class PruneCommands {
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, Commands.CommandSelection commandSelection) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext commandBuildContext, Commands.CommandSelection commandSelection) {
 
         dispatcher.register(Commands.literal("prune").requires(source -> {
             return source.hasPermission(2); //
@@ -37,47 +38,47 @@ public class PruneCommands {
 
     private static int prune(CommandSourceStack source, boolean deep, @Nullable ServerLevel level, @Nullable DataFileType subDirectory, boolean doNotBackup) {
 
-        source.sendSuccess(new TextComponent("Starting Prune"), true);
+        source.sendSuccess(() -> Component.literal("Starting Prune"), true);
         ResourceKey<Level> levelKey = level == null ? Level.OVERWORLD : level.dimension();
 
         if (subDirectory == null) {
-            source.sendSuccess(new TextComponent("Pruning region files."), true);
+            source.sendSuccess(() -> Component.literal("Pruning region files."), true);
             if (PruneManager.prune(level, DataFileType.REGION_FILES, doNotBackup)) {
-                source.sendSuccess(new TextComponent("Pruned " + DataFileType.REGION_FILES + " successfully!"), false);
+                source.sendSuccess(() -> Component.literal("Pruned " + DataFileType.REGION_FILES + " successfully!"), false);
             } else {
-                source.sendFailure(new TextComponent("Failed to prune region" + ", check the log for details."));
+                source.sendFailure(Component.literal("Failed to prune region" + ", check the log for details."));
             }
-            source.sendSuccess(new TextComponent("Pruning poi files."), true);
+            source.sendSuccess(() -> Component.literal("Pruning poi files."), true);
 
             if (PruneManager.prune(level, DataFileType.POI_FILES, doNotBackup)) {
-                source.sendSuccess(new TextComponent("Pruned " + DataFileType.POI_FILES + " successfully!"), false);
+                source.sendSuccess(() -> Component.literal("Pruned " + DataFileType.POI_FILES + " successfully!"), false);
             } else {
-                source.sendFailure(new TextComponent("Failed to prune poi, check the log for details."));
+                source.sendFailure(Component.literal("Failed to prune poi, check the log for details."));
             }
         } else {
             if (PruneManager.prune(level, subDirectory, doNotBackup)) {
-                source.sendSuccess(new TextComponent("Pruned " + subDirectory + " successfully!"), false);
+                source.sendSuccess(() -> Component.literal("Pruned " + subDirectory + " successfully!"), false);
             } else {
-                source.sendFailure(new TextComponent("Failed to prune " + subDirectory + ", check the log for details."));
+                source.sendFailure(Component.literal("Failed to prune " + subDirectory + ", check the log for details."));
             }
         }
 
         if (deep) {
-            source.sendSuccess(new TextComponent("Starting deep pruning of claim adjacent chunks."), true);
+            source.sendSuccess(() -> Component.literal("Starting deep pruning of claim adjacent chunks."), true);
             if(!doNotBackup) {
-                source.sendSuccess(new TextComponent("Starting backup."), true);
+                source.sendSuccess(() -> Component.literal("Starting backup."), true);
                 if(!BackupManager.backupClaimContainingFiles(level,DataFileType.REGION_FILES)){
-                    source.sendFailure(new TextComponent("Backup Failed, Aborting."));
+                    source.sendFailure(Component.literal("Backup Failed, Aborting."));
                     return 1;
                 }
                 else {
-                    source.sendSuccess(new TextComponent("Starting deep prune."), true);
+                    source.sendSuccess(() -> Component.literal("Starting deep prune."), true);
                 }
             }
             if (PruneManager.manuallyPruneClaimAdjacentChunks(levelKey)) {
-                source.sendSuccess(new TextComponent("Deep prune complete."), true);
+                source.sendSuccess(() -> Component.literal("Deep prune complete."), true);
             } else {
-                source.sendSuccess(new TextComponent("An error occurred while deep pruning, check the log for details."), true);
+                source.sendSuccess(() -> Component.literal("An error occurred while deep pruning, check the log for details."), true);
             }
         }
         return 1;

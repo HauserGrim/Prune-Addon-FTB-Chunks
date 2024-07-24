@@ -1,7 +1,10 @@
 {
   "required": true,
-  "compatibilityLevel": "JAVA_8",
   "package": "xyz.starmun.pruneaddonftbchunks.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+  ],
   "mixins": [
     "PruneAddonChunkMapMixin",
     "PruneAddonDistanceManagerMixin",
@@ -9,8 +12,5 @@
   ],
   "injectors": {
     "defaultRequire": 1
-  },
-  "client":[
-  ],
-  "minVersion": "0.8"
+  }
 }
